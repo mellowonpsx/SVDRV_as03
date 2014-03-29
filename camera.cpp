@@ -14,32 +14,53 @@ Camera::Camera()
 {
     this->x= 0;
     this->y= 0;
-    this->z= 500.0;
-    this->r = 1000.0;
+    this->z= -1.0;
+    this->r = 1.0;
     this->tetaAngle = 0.0;
     this->phiAngle = 0.0;
+    this->depth = -1.0;
     this->hasChanged = true;
 }
 
-Camera::Camera(double newX, double newY, double newZ)
+Camera::Camera(double newX, double newY, double newZ, double newR, Angle newTetaAngle, Angle newPhiAngle, double newDepth)
 {
-    /*this->x = newX;
+    this->x = newX;
     this->y = newY;
     this->z = newZ;
-    this->hasChanged = true;*/
-    this[0] = Camera();
+    this->r = newR;
+    this->tetaAngle = newTetaAngle;
+    this->phiAngle = newPhiAngle;
+    this->depth = newDepth;
+    this->hasChanged = true;
+}
+
+void Camera::setCameraBound(double newMinX, double newMaxX, double newMinY, double newMaxY, double newMinZ, double newMaxZ)
+{
+    this->minX = newMinX;
+    this->maxX = newMaxX;
+    this->minY = newMinY;
+    this->maxY = newMaxY;
+    this->minZ = newMinZ;
+    this->maxZ = newMaxZ;
+}
+
+void Camera::setR(double newR)
+{
+    this->r = newR;
+    this->hasChanged = true;
 }
 
 void Camera::updateLookValue()
 {
     if(this->hasChanged)
     {
-        // test Value
+        // camera position is my position
         this->cameraX = x;
         this->cameraY = y;
         this->cameraZ = z;
 
-        // test Value
+        // from wiki i have this conversion tips
+        // but my sistem is different
         //x = r sin teta cos phi
         //y = r sin teta sin phi
         //z = r cos teta
@@ -48,7 +69,7 @@ void Camera::updateLookValue()
         // x, y, z => (-z), x, y
         // teta = teta-90°
         // this make 0.0 in front of you, increase to look up, decrease to look down
-        // phi = 180°-thi
+        // phi = 180°-phi
         // this make 0.0 in front of you, increase to look right, decrease to look left
 
         Angle tetaVisionAngle(-90.0);
@@ -66,7 +87,7 @@ void Camera::updateLookValue()
         this->upX = 0.0;
         this->upY = 1.0;
         this->upZ = 0.0;
-        hasChanged = false;
+        this->hasChanged = false;
     }
 }
 
@@ -170,27 +191,16 @@ void Camera::strafeRight()
 
 void Camera::strafeUp()
 {
+    // strafe up (like jump) is the same of moveCameraUp
     this->hasChanged = true;
-
-    // when i strafe i move parallel on vision angle (?)
-    Angle tetaVisionAngle(-90.0);
-    tetaVisionAngle += tetaAngle;
-
-    // I strafe left, so my phi angle is 90° less
-    Angle phiVisionAngle(180.0+90.0);
-    phiVisionAngle += phiAngle;
-    double tetaVisionRadiant = tetaVisionAngle.getRadiantAngle();
-    double phiVisionRadiant = phiVisionAngle.getRadiantAngle();
-
-    z = z-(STRAFE_STEP)*sin(tetaVisionRadiant)*cos(phiVisionRadiant);
-    x = x+(STRAFE_STEP)*sin(tetaVisionRadiant)*sin(phiVisionRadiant);
-    // when i strafe i don't modify my y value
-    //y = y+(STRAFE_STEP)*cos(tetaVisionRadiant);
+    this->moveCameraUp();
 }
 
 void Camera::strafeDown()
 {
-
+    // strafe up (like fall down) is the same of moveCameraDown
+    this->hasChanged = true;
+    this->moveCameraDown();
 }
 
 void Camera::moveForward()
@@ -279,4 +289,9 @@ double Camera::getUpZ()
 {
     this->updateLookValue();
     return this->upZ;
+}
+
+double Camera::getDepth()
+{
+    return this->depth;
 }

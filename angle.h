@@ -7,17 +7,21 @@ class Angle
 {
 private:
     double angle;
+    double angleMin;
+    double angleMax;
+    bool limited;
 public:
     Angle();
-    Angle(double);
-    Angle& operator+= (double);
-    Angle& operator-= (double);
-    Angle& operator= (double);
-    Angle& operator+= (Angle);
-    Angle& operator-= (Angle);
-    Angle& operator= (Angle);
+    Angle(double newAngle);
+    Angle& operator+= (double angleToAdd);
+    Angle& operator-= (double angleToSub);
+    Angle& operator= (double angleToAssign);
+    Angle& operator+= (Angle angleToAdd);
+    Angle& operator-= (Angle angleToSub);
+    //Angle& operator= (Angle angleToAssign);
     double getAngle();
     double getRadiantAngle();
+    void setAngleLimit(double newAngleMin, double newAngleMax);
     friend std::ostream& operator<<(std::ostream& os, const Angle& angle);
 };
 

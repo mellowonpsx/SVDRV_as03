@@ -14,47 +14,41 @@ private:
     double lookAtX,lookAtY,lookAtZ; // camera look-at
     double upX,upY,upZ; // camera up
 
+    double minX, maxX, minY, maxY, minZ, maxZ;
     // position and angle of vision of camera
-    double x,y,z,r;
+    double x,y,z,r,depth;
     Angle tetaAngle, phiAngle;
     bool hasChanged;
     void updateLookValue();
 public:
     Camera();
-    Camera(double, double, double);
-    // static camera movemet
+    Camera(double newX, double newY, double newZ, double newR,  Angle newTetaAngle, Angle newPhiAngle, double newDepth);
+    void setCameraBound(double newMinX, double newMaxX, double newMinY, double newMaxY, double newMinZ, double newMaxZ);
+    void setR(double newR);
+    // static camera movement, used in test
     void moveCameraForward();
     void moveCameraBackward();
     void moveCameraLeft();
     void moveCameraRight();
     void moveCameraUp();
     void moveCameraDown();
-    void rotateCameraLeft();
-    void rotateCameraRight();
-    void rotateCameraUp();
-    void rotateCameraDown();
 
     // dynamic camera movement
-    // FPS Style
+    // head movement vs body movement
+    // body movement
     void strafeLeft();
     void strafeRight();
     void moveForward();
     void moveBackward();
     void strafeUp();
     void strafeDown();
-    //void staticForward();
-    //void staticMoveBackward();
+    // head movement
+    void rotateCameraLeft();
+    void rotateCameraRight();
+    void rotateCameraUp();
+    void rotateCameraDown();
 
-    /*void moveForward();
-    void moveBackward();
-    void moveLeft();
-    void moveRight();
-    void rotateUp();
-    void rotateDown();
-    void rotateUp();
-    void rotateDown();*/
-
-
+    // get methods
     double getCameraX();
     double getCameraY();
     double getCameraZ();
@@ -64,6 +58,7 @@ public:
     double getUpX();
     double getUpY();
     double getUpZ();
+    double getDepth();
 };
 
 #endif // CAMERA_H
