@@ -20,7 +20,18 @@ using namespace std;
 #define DEFAULT_FONT_B 1.0
 #define DEFAULT_FONT_HEIGHT 24.0
 #define DEFAULT_DELTA_FRACTION 1;
-#define DEFAULT_WEEL_STEP 5;
+
+typedef struct
+{
+    GLuint textureId; // textureId is used to blind texture
+} RectangularTexturedShape;
+
+typedef struct
+{
+    double x,y,z; // center coordinate
+    double dimX, dimY, dimZ; // abs dimension
+    GLuint textureId; // textureId is used to blind texture
+} TexturedTree;
 
 void handleKeypress(unsigned char key,int x,int y);
 void handleSpecialKeypress(int key,int x,int y);
@@ -31,7 +42,7 @@ void changeSize(int w, int h);
 void initModel();
 void draw2DText(double x, double y, string text);
 void draw3DText(double x, double y, double z, string text);
-void initTextureId(GLuint *textureId, char* filename, GLenum rgbMode);
+void initTextureId(GLuint *textureId, string filename, GLenum rgbMode);
 void mouseMove(int x, int y);
 void mouseButton(int button, int state, int x, int y);
 void pressKey(int key, int xx, int yy);
@@ -40,12 +51,15 @@ void releaseKey(int key, int x, int y);
 // variabiles
 bool isChanged, isRunning, showLabels;
 Camera camera;
+RectangularTexturedShape grass, sky_line, sky_plane;
+RectangularTexturedShape window, door, water, border, roof, wall, floorTexture;
+TexturedTree alberellobello1, alberellobello2, alberellobello3, alberellobello4;
 
 // load a texture and link to a identifier
-void initTextureId(GLuint *textureId, char* filename, GLenum rgbMode)
+void initTextureId(GLuint *textureId, string filename, GLenum rgbMode)
 {
     // load file & error check
-    SDL_Surface* surface = IMG_Load(filename);
+    SDL_Surface* surface = IMG_Load(filename.c_str());
     if (surface==NULL)
     {
         printf("Error: \"%s\"\n",SDL_GetError());
@@ -58,8 +72,11 @@ void initTextureId(GLuint *textureId, char* filename, GLenum rgbMode)
     // produce a 2D texture from the loaded image pixel
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface->w,surface->h, 0, rgbMode,GL_UNSIGNED_BYTE,surface->pixels);
     // set method to filter texture
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
     // free memory from file
     SDL_FreeSurface(surface);
 }
@@ -99,8 +116,8 @@ int main( int argc, char** argv )
     //glutSpecialUpFunc(releaseKey);
 
     // mouse handling
-    glutMouseFunc(mouseButton);
-    glutMotionFunc(mouseMove);
+    //glutMouseFunc(mouseButton);
+    //glutMotionFunc(mouseMove);
     // called in case of resize
     glutReshapeFunc(changeSize);
     // call this whenever window needs redrawing
@@ -160,40 +177,8 @@ void handleSpecialKeypress(int key,int x,int y)
             camera.rotateCameraRight();
             break;
     }
-
+    // used to not have warning (i hate useless warning!)
     return (void)(x+y);
-}
-
-void pressKey(int key, int x, int y)
-{
-/*    switch (key)
-    {
-        case GLUT_KEY_CTRL_L:
-        case GLUT_KEY_ALT_L:
-        case GLUT_KEY_ALT_R:
-        case GLUT_KEY_CTRL_R:
-        case GLUT_KEY_SHIFT_L:
-        case GLUT_KEY_SHIFT_R: activeKeyModifiers = 1;
-    }
-
-    // used to not have warning (i hate warning!)
-    return (void)(x+y);*/
-}
-
-void releaseKey(int key, int x, int y)
-{
-    /*switch (key)
-    {
-        case GLUT_KEY_CTRL_L:
-        case GLUT_KEY_ALT_L:
-        case GLUT_KEY_ALT_R:
-        case GLUT_KEY_CTRL_R:
-        case GLUT_KEY_SHIFT_L:
-        case GLUT_KEY_SHIFT_R: activeKeyModifiers = 0;
-    }
-
-    // used to not have warning (i hate warning!)
-    return (void)(x+y);*/
 }
 
 void changeSize(int w, int h)
@@ -225,9 +210,22 @@ void initRendering()
 {
     glEnable(GL_DEPTH_TEST);	// Depth testing must be turned on
     glEnable(GL_TEXTURE_2D);
-    glEnable(GL_LIGHTING);
     glShadeModel(GL_SMOOTH);
-    //glEnable(GL_CULL_FACE); //if used i don't see the "inside" of sphere->trick used to fancy universe effect
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    //glEnable(GL_NORMALIZE);
+
+    // enable blender
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable (GL_ALPHA_TEST) ;
+    // depends on image "transparecy"
+    glAlphaFunc(GL_GREATER, 0.0f);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+    // helpfull to undestand which side is
+    //glEnable(GL_CULL_FACE);
+    //glEnable(GL_COLOR_MATERIAL);
 }
 
 void drawLegend()
@@ -252,30 +250,533 @@ void drawTimer()
     draw2DText(1.0,GLUT_WINDOW_HEIGHT*1.89, time.str());
 }
 
-int angle;
-
-void drawGround()
+void drawRectTexturedFixedY(double xi, double xf, double y, double zi, double zf, double repeatedTextureX, double repeatedTextureZ, GLuint textureId)
 {
-    angle++;
-    angle%=360;
-    glDisable(GL_LIGHTING);
-    //glColor4d(1.0, 1.0, 1.0, 1.0);
-    //glRotated(angle, 1.0,1.0,1.0);
-    glColor4d(0.2, 0.2, 0.2, 1.0);
-    glBegin(GL_QUADS);
-        glVertex3d(-100.0, 0.0, -100.0);
-        glVertex3d(-100.0, 0.0,  100.0);
-        glVertex3d( 100.0, 0.0,  100.0);
-        glVertex3d( 100.0, 0.0, -100.0);
-    glEnd();
-    glColor4d(0.2, 0.0, 0.0, 0.2);
-    glBegin(GL_QUADS);
-        glVertex3d(-100.0, -100.0, -100.0);
-        glVertex3d(-100.0, 100.0, -100.0);
-        glVertex3d( 100.0, 100.0,-100.0);
-        glVertex3d( 100.0, -100.0, -100.0);
-    glEnd();
-    glEnable(GL_LIGHTING);
+    glPushMatrix();
+        glTranslated(xi,y,zi);
+        glColor4d(1.0, 1.0, 1.0, 1.0);
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureZ);
+            glVertex3d(0.0, 0.0, zf);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureZ);
+            glVertex3d(xf, 0.0, zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, 0.0, 0.0);
+        glEnd();
+    glPopMatrix();
+}
+
+void drawRectTexturedFixedX(double x, double yi, double yf, double zi, double zf, double repeatedTextureY, double repeatedTextureZ, GLuint textureId)
+{
+    glPushMatrix();
+        // rotate to has right texture position
+        glTranslated(0.0,yf+yi,0.0);
+        glRotated(90.0,1.0,0.0,0.0); // rotate around x axis of texture
+        // having rotate the axis system cause x-y swap
+        double temp = zi;
+        zi = yi;
+        yi = temp;
+        temp = zf;
+        zf = yf;
+        yf = temp;
+        glTranslated(x,yi,zi);
+        glColor4d(1.0, 1.0, 1.0, 1.0);
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureZ);
+            glVertex3d(0.0, 0.0,  zf);
+
+            glTexCoord2f(repeatedTextureY,repeatedTextureZ);
+            glVertex3d(0.0, yf,  zf);
+
+            glTexCoord2f(repeatedTextureZ,0.0);
+            glVertex3d(0.0, yf, 0.0);
+        glEnd();
+    glPopMatrix();
+}
+
+void drawRectTexturedFixedZ(double xi, double xf, double yi, double yf, double z, double repeatedTextureX, double repeatedTextureY, GLuint textureId)
+{
+    glPushMatrix();
+        // rotate to has right texture position
+        glTranslated(0.0,yf+yi,0.0);
+        glRotated(180.0,0.0,0.0,1.0); // rotate around x axis of texture
+        // no other trasform cause rotate 180 degrees
+        glTranslated(xi,yi,z);
+        glColor4d(1.0, 1.0, 1.0, 1.0);
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(0.0, yf, 0.0);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf, yf,  0.0);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, 0.0, 0.0);
+        glEnd();
+    glPopMatrix();
+}
+
+void drawGroundAndSky()
+{
+    // left side
+    drawRectTexturedFixedX(-1010.0, -10.0, 1010.0, -1010.0, 2020.0, 1000.0, 1.0, sky_line.textureId);
+    // front side
+    drawRectTexturedFixedZ(-1010.0, 2020.0, -10.0, 1010.0, -1010.0, 1000.0, 1.0, sky_line.textureId);
+    // right side
+    drawRectTexturedFixedX(1010.0, -10.0, 1010.0, -1010.0, 2020.0, 1000.0, 1.0, sky_line.textureId);
+    // back side
+    drawRectTexturedFixedZ(-1010.0, 2020.0, -10.0, 1010.0, 1010.0, 1000.0, 1.0, sky_line.textureId);
+    // roof
+    drawRectTexturedFixedY(-1010.0, 2020.0, 1000.0, 1010.0, -2020.0, 1.0, 1.0, sky_plane.textureId);
+    // grass ground
+    drawRectTexturedFixedY(-1010.0, 2020.0, 0.0, 1010.0, -2020.0, 4000.0, 4000.0, grass.textureId);
+    glPopMatrix();
+}
+
+void drawHouse()
+{
+    glPushMatrix();
+        // rotate to has right texture position
+        double xf, xi, yf, yi, zi, zf, repeatedTextureY, repeatedTextureX;
+        xi = 0.0;
+        xf = 50.0;
+        yi = 0.0;
+        yf = 10.0;
+        zi = -50.0;
+        zf = -50.0;
+        repeatedTextureX = 15.0;
+        repeatedTextureY = 3.0;
+        glTranslated(0.0,yf+yi,0.0);
+        glRotated(180.0,0.0,0.0,1.0); // rotate around x axis of texture
+        // no other trasform cause rotate 180 degrees
+        glTranslated(xi,yi,zi);
+        glColor4d(1.0, 1.0, 1.0, 1.0);
+        glBindTexture(GL_TEXTURE_2D, wall.textureId);
+        glBegin(GL_POLYGON);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(0.0, yf, 0.0);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf, yf,  0.0);
+
+            //glVertex3d(xf, 0.0, zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, 0.0, 0.0);
+
+            glTexCoord2f(repeatedTextureX*0.5,repeatedTextureY);
+            glVertex3d(xf*0.5, -yf, 0.0);
+        glEnd();
+
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(0.0, yf, 0.0);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(0.0, yf,  zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(0.0, 0.0, zf);
+
+        glEnd();
+
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(xf, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(xf, yf, 0.0);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf, yf,  zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, 0.0, zf);
+
+        glEnd();
+
+        glBegin(GL_POLYGON);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, zf);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(0.0, yf, zf);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf, yf,  zf);
+
+            //glVertex3d(xf, 0.0, zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, 0.0, zf);
+
+            glTexCoord2f(repeatedTextureX*0.5,repeatedTextureY);
+            glVertex3d(xf*0.5, -yf, zf);
+        glEnd();
+
+        // roof
+        glBindTexture(GL_TEXTURE_2D, roof.textureId);
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(xf*0.5, -yf, 0.0);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf*0.5, -yf,  zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(0.0, 0.0, zf);
+
+        glEnd();
+        //glBindTexture(GL_TEXTURE_2D, roof.textureId);
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(xf, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(xf*0.5, -yf, 0.0);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf*0.5, -yf,  zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, 0.0, zf);
+
+        glEnd();
+        // floor
+        glBindTexture(GL_TEXTURE_2D, floorTexture.textureId);
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, yf-0.1, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(0.0, yf-0.1, zf);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf, yf-0.1,  zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, yf-0.1, 0.0);
+
+        glEnd();
+        // door
+        glBindTexture(GL_TEXTURE_2D, door.textureId);
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(xf*0.56, yf*0.1, 0.0+0.1);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(xf*0.56, yf, 0.0+0.1);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(xf*0.44, yf,  0.0+0.1);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(xf*0.44, yf*0.1, 0.0-0.1);
+
+            //inside
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(xf*0.56, yf*0.1, 0.0-0.1);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(xf*0.56, yf, 0.0-0.1);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(xf*0.44, yf,  0.0-0.1);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(xf*0.44, yf*0.1, 0.0+0.1);
+        glEnd();
+        // door
+        glBindTexture(GL_TEXTURE_2D, window.textureId);
+        glBegin(GL_QUADS);
+            //1
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(-0.1, yf*0.7, zf*0.2);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(-0.1, yf*0.2, zf*0.2);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(-0.1, yf*0.2,  zf*0.3);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(-0.1, yf*0.7, zf*0.3);
+
+            //2
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(-0.1, yf*0.7, zf*0.7);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(-0.1, yf*0.2, zf*0.7);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(-0.1, yf*0.2,  zf*0.8);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(-0.1, yf*0.7, zf*0.8);
+            //3
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(xf+0.1, yf*0.7, zf*0.2);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(xf+0.1, yf*0.2, zf*0.2);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(xf+0.1, yf*0.2,  zf*0.3);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(xf+0.1, yf*0.7, zf*0.3);
+
+            //4
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(xf+0.1, yf*0.7, zf*0.7);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(xf+0.1, yf*0.2, zf*0.7);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(xf+0.1, yf*0.2,  zf*0.8);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(xf+0.1, yf*0.7, zf*0.8);
+
+            // inside
+            //1
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(+0.1, yf*0.7, zf*0.2);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(+0.1, yf*0.2, zf*0.2);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(+0.1, yf*0.2,  zf*0.3);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(+0.1, yf*0.7, zf*0.3);
+
+            //2
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(+0.1, yf*0.7, zf*0.7);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(+0.1, yf*0.2, zf*0.7);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(+0.1, yf*0.2,  zf*0.8);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(+0.1, yf*0.7, zf*0.8);
+            //3
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(xf-0.1, yf*0.7, zf*0.2);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(xf-0.1, yf*0.2, zf*0.2);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(xf-0.1, yf*0.2,  zf*0.3);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(xf-0.1, yf*0.7, zf*0.3);
+
+            //4
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(xf-0.1, yf*0.7, zf*0.7);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(xf-0.1, yf*0.2, zf*0.7);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(xf-0.1, yf*0.2,  zf*0.8);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(xf-0.1, yf*0.7, zf*0.8);
+
+        glEnd();
+    glPopMatrix();
+}
+
+double animationstep;
+
+void drawPool()
+{
+    glPushMatrix();
+        // rotate to has right texture position
+        double xf, xi, yf, yi, zi, zf, repeatedTextureY, repeatedTextureX;
+        xi = -25.0;
+        xf = 20.0;
+        yi = 0.0;
+        yf = 0.2;
+        zi = -60.0;
+        zf = -30.0;
+        repeatedTextureX = 15.0;
+        repeatedTextureY = 3.0;
+        glTranslated(0.0,yf+yi,0.0);
+        glRotated(180.0,0.0,0.0,1.0); // rotate around x axis of texture
+        // no other trasform cause rotate 180 degrees
+        glTranslated(xi,yi,zi);
+        glColor4d(1.0, 1.0, 1.0, 1.0);
+        glBindTexture(GL_TEXTURE_2D, border.textureId);
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(0.0, yf, 0.0);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf, yf,  0.0);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, 0.0, 0.0);
+
+        glEnd();
+
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(0.0, yf, 0.0);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(0.0, yf,  zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(0.0, 0.0, zf);
+
+        glEnd();
+
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(xf, 0.0, 0.0);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(xf, yf, 0.0);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf, yf,  zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, 0.0, zf);
+
+        glEnd();
+
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, zf);
+
+            glTexCoord2f(0.0,repeatedTextureY);
+            glVertex3d(0.0, yf, zf);
+
+            glTexCoord2f(repeatedTextureX,repeatedTextureY);
+            glVertex3d(xf, yf,  zf);
+
+            glTexCoord2f(repeatedTextureX,0.0);
+            glVertex3d(xf, 0.0, zf);
+
+        glEnd();
+
+        // water
+        // water animation
+        animationstep = animationstep + 0.001;
+        if(animationstep >= 1.0 || animationstep <= 0.0) animationstep = 0.0;
+        glBindTexture(GL_TEXTURE_2D, water.textureId);
+        glBegin(GL_QUADS);
+
+            glTexCoord2f(0.0+animationstep,0.0+animationstep);
+            glVertex3d(0.0, 0.0+0.1, 0.0);
+
+            glTexCoord2f(0.0+animationstep,repeatedTextureY+animationstep);
+            glVertex3d(0.0, 0.0+0.1, zf);
+
+            glTexCoord2f(repeatedTextureX+animationstep,repeatedTextureY+animationstep);
+            glVertex3d(xf, 0.0+0.1,  zf);
+
+            glTexCoord2f(repeatedTextureX+animationstep,0.0+animationstep);
+            glVertex3d(xf, 0.0+0.1, 0.0);
+
+        glEnd();
+    glPopMatrix();
+}
+
+void drawTree(TexturedTree* tree)
+{
+    glPushMatrix();
+        //(x,y,z) center of figure
+    glTranslated(tree->x-(tree->dimX/2), tree->y, tree->z+(tree->dimZ/2));
+        glRotated(180.0,1.0,0.0,0.0); // rotate around x axis of texture
+        //glTranslated(0.0,(tree->y/2)-(tree->dimY/2),0.0);
+        glTranslated(0.0,-(tree->dimY/2),0.0);
+        glColor4d(1.0, 1.0, 1.0, 1.0);
+        glBindTexture(GL_TEXTURE_2D, tree->textureId);
+        glBegin(GL_QUADS);
+            // a tree
+            glTexCoord2f(0.0,0.0);
+            glVertex3d(0.0, 0.0, (tree->dimZ/2));
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d(0.0, tree->dimY, (tree->dimZ/2));
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d(tree->dimX, tree->dimY, (tree->dimZ/2));
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d(tree->dimX, 0.0, (tree->dimZ/2));
+
+            //a tree perpendicular
+            glTexCoord2f(0.0,0.0);
+            glVertex3d((tree->dimX/2), 0.0, 0.0);
+
+            glTexCoord2f(0.0,1.0);
+            glVertex3d((tree->dimX/2), tree->dimY, 0.0);
+
+            glTexCoord2f(1.0,1.0);
+            glVertex3d((tree->dimX/2), tree->dimY,  tree->dimZ);
+
+            glTexCoord2f(1.0,0.0);
+            glVertex3d((tree->dimX/2), 0.0, tree->dimZ);
+        glEnd();
+        glPopMatrix();
 }
 
 void drawScene()
@@ -285,15 +786,23 @@ void drawScene()
     glLoadIdentity();
 
     // look at using camera class
-    /*cout << camera.getCameraX() << " " << camera.getCameraY() << " " << camera.getCameraZ() << " "
-         << camera.getLookAtX() << " " << camera.getLookAtY() << " " << camera.getLookAtZ() << endl;*/
     gluLookAt(	camera.getCameraX(), camera.getCameraY(), camera.getCameraZ(),
                 camera.getLookAtX(), camera.getLookAtY(), camera.getLookAtZ(),
                 camera.getUpX(), camera.getUpY(), camera.getUpZ());
 
+    glDisable(GL_LIGHTING); // until we define the lights
     // draw model
-    drawGround();
+    drawGroundAndSky();
 
+    drawTree(&alberellobello1);
+    drawTree(&alberellobello2);
+    drawTree(&alberellobello3);
+    drawTree(&alberellobello4);
+
+    drawHouse();
+    drawPool();
+
+    glEnable(GL_LIGHTING); // until we define the lights
     // draw fps
     drawTimer();
 
@@ -367,11 +876,66 @@ void draw3DText(double x, double y, double z, string text)
 void initModel()
 {
     //new camera function
-    // i'm in 0 0 500 and i look straight forward to 0 0 0l
+    // i'm in 0 0 50 and i look straight forward to 0 0 0l
     Angle tetaAngleRange;
-    tetaAngleRange.setAngleLimit(-80.0, 90.0);
-    camera = Camera(0.0, 20.0, 500.0, 100.0, tetaAngleRange, 0.0, -1.0);
-    camera.setCameraBound(-1000.0, 1000.0, 0.0, 1000.0, -1000.0, 1000.0);
+    tetaAngleRange.setAngleLimit(-89.0, 89.0);
+    camera = Camera(0.0, 0.0, 0.0, 100.0, tetaAngleRange, 0.0, -1.0);
+    // remember in owr system of coordinates, z is negative
+    camera.setCameraBound(-1000.0, 1000.0, 2.0, 200.0, 1000.0, -1000.0);
+
+    // load texture
+
+    initTextureId(&grass.textureId, "../SVDRV_as03/Image/grass.jpg", GL_RGB);
+    initTextureId(&sky_line.textureId, "../SVDRV_as03/Image/sky_line.jpg", GL_RGB);
+    initTextureId(&sky_plane.textureId, "../SVDRV_as03/Image/sky.jpg", GL_RGB);
+
+    initTextureId(&window.textureId, "../SVDRV_as03/Image/window.jpg", GL_RGB);
+    initTextureId(&door.textureId, "../SVDRV_as03/Image/door.jpg", GL_RGB);
+    initTextureId(&water.textureId, "../SVDRV_as03/Image/water.jpg", GL_RGB);
+    initTextureId(&border.textureId, "../SVDRV_as03/Image/marble.jpg", GL_RGB);
+    initTextureId(&roof.textureId, "../SVDRV_as03/Image/roof.jpg", GL_RGB);
+    initTextureId(&floorTexture.textureId, "../SVDRV_as03/Image/floor.jpg", GL_RGB);
+    initTextureId(&wall.textureId, "../SVDRV_as03/Image/brick.jpg", GL_RGB);
+
+    // first tree
+    initTextureId(&alberellobello1.textureId, "../SVDRV_as03/Image/beech.png", GL_RGBA);
+    alberellobello1.dimX = 70.0;
+    alberellobello1.dimY = 60.0;
+    alberellobello1.dimZ = 70.0;
+    alberellobello1.x = 40.0;
+    alberellobello1.y = (alberellobello1.dimY/2);
+    alberellobello1.z = -80.0;
+    // end first tree
+
+    // second tree
+    initTextureId(&alberellobello2.textureId, "../SVDRV_as03/Image/beech.png", GL_RGBA);
+    alberellobello2.dimX = 60.0;
+    alberellobello2.dimY = 80.0;
+    alberellobello2.dimZ = 60.0;
+    alberellobello2.x = -80.0;
+    alberellobello2.y = (alberellobello2.dimY/2);
+    alberellobello2.z = -90.0;
+    // end second tree
+
+    // third tree
+    initTextureId(&alberellobello3.textureId, "../SVDRV_as03/Image/oak.png", GL_RGBA);
+    alberellobello3.dimX = 120.0;
+    alberellobello3.dimY = 100.0;
+    alberellobello3.dimZ = 120.0;
+    alberellobello3.x = -25.0;
+    alberellobello3.y = (alberellobello3.dimY/2);
+    alberellobello3.z = -140.0;
+    // end fourth tree
+
+    // fourth tree
+    initTextureId(&alberellobello4.textureId, "../SVDRV_as03/Image/pine.png", GL_RGBA);
+    alberellobello4.dimX = 2.0;
+    alberellobello4.dimY = 7.0;
+    alberellobello4.dimZ = 2.0;
+    alberellobello4.x = -20.0;
+    alberellobello4.y = (alberellobello4.dimY/2)+0.2;
+    alberellobello4.z = -75.0;
+    // end fourth tree
 
     showLabels = true;
     isRunning = true; //true
@@ -389,59 +953,4 @@ void idleScene()
         drawScene();
         //isChanged = false;
     }
-}
-
-void mouseMove(int x, int y)
-{
-    // this will only be true when the left button is down
-    /*if (xOrigin >= 0)
-    {
-        // don't like this but is what i have
-        if(activeKeyModifiers)
-        {
-             deltaZ = -(y - yOrigin)*DEFAULT_DELTA_FRACTION;
-        }
-        else
-        {
-            deltaX = (x - xOrigin)*DEFAULT_DELTA_FRACTION;
-            deltaY = (y - yOrigin)*DEFAULT_DELTA_FRACTION;
-        }
-    }*/
-}
-
-void mouseButton(int button, int state, int x, int y)
-{
-    /*// only start motion if the left button is pressed
-    if (button == GLUT_LEFT_BUTTON)
-    {
-        // when the button is released
-        if (state == GLUT_UP)
-        {
-            xOrigin = -1;
-            yOrigin = -1;
-        }
-        else
-        {
-            // state = GLUT_DOWN
-            xOrigin = x;
-            yOrigin = y;
-        }
-    }
-    // Wheel reports as button 3(scroll up) and button 4(scroll down)
-    if (button == 3) // It's a wheel event
-    {
-        if(state == GLUT_DOWN)
-            if(deltaZ <= deltaZMax)
-            {
-                deltaZ+= DEFAULT_WEEL_STEP;
-            }
-    }
-    if (button == 4)
-    {
-        if(state == GLUT_DOWN)
-            if(deltaZ >= deltaZMin)
-            {
-                deltaZ-= DEFAULT_WEEL_STEP;
-            }
-    }*/
 }

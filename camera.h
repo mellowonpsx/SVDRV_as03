@@ -25,6 +25,7 @@ public:
     Camera(double newX, double newY, double newZ, double newR,  Angle newTetaAngle, Angle newPhiAngle, double newDepth);
     void setCameraBound(double newMinX, double newMaxX, double newMinY, double newMaxY, double newMinZ, double newMaxZ);
     void setR(double newR);
+    void checkBounds();
     // static camera movement, used in test
     void moveCameraForward();
     void moveCameraBackward();
@@ -36,17 +37,30 @@ public:
     // dynamic camera movement
     // head movement vs body movement
     // body movement
+    void moveForward();
+    void moveForward(double step);
+    void moveBackward();
+    void moveBackward(double step);
+    void moveAlongDirection(double step); //maybe better private?
     void strafeLeft();
     void strafeRight();
-    void moveForward();
-    void moveBackward();
+    void strafeLeft(double step);
+    void strafeRight(double step);
+    void strafeHoriziontal(double step); //maybe better private?
     void strafeUp();
     void strafeDown();
+    void strafeVertical(double step); //maybe better private?
     // head movement
     void rotateCameraLeft();
+    void rotateCameraLeft(double step);
     void rotateCameraRight();
+    void rotateCameraRight(double step);
+    void rotateHotiziontal(double step); //maybe better private?
     void rotateCameraUp();
+    void rotateCameraUp(double step);
     void rotateCameraDown();
+    void rotateCameraDown(double step);
+    void rotateVertical(double step); //maybe better private?
 
     // get methods
     double getCameraX();

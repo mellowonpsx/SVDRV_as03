@@ -54,6 +54,7 @@ void Camera::updateLookValue()
 {
     if(this->hasChanged)
     {
+        this->checkBounds();
         // camera position is my position
         this->cameraX = x;
         this->cameraY = y;
@@ -97,6 +98,19 @@ void Camera::moveCameraForward()
     this->z -= Z_MOVE_STEP;
 }
 
+void Camera::checkBounds()
+{
+    this->hasChanged = true;
+    // remember z is strange, it is negative
+    if(this-> z < this->maxZ) this->z = this->maxZ;
+    if(this-> z > this->minZ) this->z = this->minZ;
+    // other are normal
+    if(this-> x > this->maxX) this->x = this->maxX;
+    if(this-> x < this->minX) this->x = this->minX;
+    if(this-> y > this->maxY) this->y = this->maxY;
+    if(this-> y < this->minY) this->y = this->minY;
+}
+
 void Camera::moveCameraBackward()
 {
     this->hasChanged = true;
@@ -127,31 +141,7 @@ void Camera::moveCameraDown()
     this->y -= VERT_MOVE_STEP;
 }
 
-void Camera::rotateCameraLeft()
-{
-    this->hasChanged = true;
-    this->phiAngle -= ORIZ_ANGLE_STEP;
-}
-
-void Camera::rotateCameraRight()
-{
-    this->hasChanged = true;
-    this->phiAngle += ORIZ_ANGLE_STEP;
-}
-
-void Camera::rotateCameraUp()
-{
-    this->hasChanged = true;
-    this->tetaAngle += VERT_ANGLE_STEP;
-}
-
-void Camera::rotateCameraDown()
-{
-    this->hasChanged = true;
-    this->tetaAngle -= VERT_ANGLE_STEP;
-}
-
-void Camera::strafeLeft()
+void Camera::strafeHoriziontal(double step)
 {
     this->hasChanged = true;
 
@@ -164,78 +154,158 @@ void Camera::strafeLeft()
     double tetaVisionRadiant = tetaVisionAngle.getRadiantAngle();
     double phiVisionRadiant = phiVisionAngle.getRadiantAngle();
 
-    z = z-(-STRAFE_STEP)*sin(tetaVisionRadiant)*cos(phiVisionRadiant);
-    x = x+(-STRAFE_STEP)*sin(tetaVisionRadiant)*sin(phiVisionRadiant);
+    z = z-(step)*sin(tetaVisionRadiant)*cos(phiVisionRadiant);
+    x = x+(step)*sin(tetaVisionRadiant)*sin(phiVisionRadiant);
     // when i strafe i don't modify my y value
     //y = y+(-STRAFE_STEP)*cos(tetaVisionRadiant);
+}
+
+void Camera::strafeLeft()
+{
+    this->hasChanged = true;
+    this->strafeHoriziontal(-STRAFE_STEP);
+}
+
+void Camera::strafeLeft(double step)
+{
+    this->hasChanged = true;
+    this->strafeHoriziontal(-fabs(step));
 }
 
 void Camera::strafeRight()
 {
     this->hasChanged = true;
+    this->strafeHoriziontal(STRAFE_STEP);
+}
 
-    Angle tetaVisionAngle(-90.0);
-    tetaVisionAngle += tetaAngle;
+void Camera::strafeRight(double step)
+{
+    this->hasChanged = true;
+    this->strafeHoriziontal(fabs(step));
+}
 
-    // I strafe left, so my phi angle is 90° less
-    Angle phiVisionAngle(180.0+90.0);
-    phiVisionAngle += phiAngle;
-    double tetaVisionRadiant = tetaVisionAngle.getRadiantAngle();
-    double phiVisionRadiant = phiVisionAngle.getRadiantAngle();
-
-    z = z-(STRAFE_STEP)*sin(tetaVisionRadiant)*cos(phiVisionRadiant);
-    x = x+(STRAFE_STEP)*sin(tetaVisionRadiant)*sin(phiVisionRadiant);
-    // when i strafe i don't modify my y value
-    //y = y+(STRAFE_STEP)*cos(tetaVisionRadiant);
+void Camera::strafeVertical(double step)
+{
+    this->hasChanged = true;
+    this->y += step;
 }
 
 void Camera::strafeUp()
 {
-    // strafe up (like jump) is the same of moveCameraUp
+    // strafe up (like jump)
     this->hasChanged = true;
-    this->moveCameraUp();
+    this->strafeVertical(STRAFE_STEP);
 }
 
 void Camera::strafeDown()
 {
-    // strafe up (like fall down) is the same of moveCameraDown
+    // strafe down (like fall down)
     this->hasChanged = true;
-    this->moveCameraDown();
+    this->strafeVertical(-STRAFE_STEP);
+}
+
+void Camera::moveAlongDirection(double step)
+{
+    this->hasChanged = true;
+
+    Angle tetaVisionAngle(-90.0);
+    tetaVisionAngle += tetaAngle;
+
+    Angle phiVisionAngle(180.0);
+    phiVisionAngle += phiAngle;
+    double tetaVisionRadiant = tetaVisionAngle.getRadiantAngle();
+    double phiVisionRadiant = phiVisionAngle.getRadiantAngle();
+
+    this->z = this->z-(step)*sin(tetaVisionRadiant)*cos(phiVisionRadiant);
+    this->x = this->x+(step)*sin(tetaVisionRadiant)*sin(phiVisionRadiant);
+    this->y = this->y+(step)*cos(tetaVisionRadiant);
 }
 
 void Camera::moveForward()
 {
     this->hasChanged = true;
+    this->moveAlongDirection(R_MOVE_STEP);
+}
 
-    Angle tetaVisionAngle(-90.0);
-    tetaVisionAngle += tetaAngle;
-
-    Angle phiVisionAngle(180.0);
-    phiVisionAngle += phiAngle;
-    double tetaVisionRadiant = tetaVisionAngle.getRadiantAngle();
-    double phiVisionRadiant = phiVisionAngle.getRadiantAngle();
-
-    z = z-(R_MOVE_STEP)*sin(tetaVisionRadiant)*cos(phiVisionRadiant);
-    x = x+(R_MOVE_STEP)*sin(tetaVisionRadiant)*sin(phiVisionRadiant);
-    y = y+(R_MOVE_STEP)*cos(tetaVisionRadiant);
+void Camera::moveForward(double step)
+{
+    this->hasChanged = true;
+    this->moveAlongDirection(fabs(step));
 }
 
 void Camera::moveBackward()
 {
     this->hasChanged = true;
-
-    Angle tetaVisionAngle(-90.0);
-    tetaVisionAngle += tetaAngle;
-
-    Angle phiVisionAngle(180.0);
-    phiVisionAngle += phiAngle;
-    double tetaVisionRadiant = tetaVisionAngle.getRadiantAngle();
-    double phiVisionRadiant = phiVisionAngle.getRadiantAngle();
-
-    z = z-(-R_MOVE_STEP)*sin(tetaVisionRadiant)*cos(phiVisionRadiant);
-    x = x+(-R_MOVE_STEP)*sin(tetaVisionRadiant)*sin(phiVisionRadiant);
-    y = y+(-R_MOVE_STEP)*cos(tetaVisionRadiant);
+    this->moveAlongDirection(-R_MOVE_STEP);
 }
+
+void Camera::moveBackward(double step)
+{
+    this->hasChanged = true;
+    this->moveAlongDirection(-fabs(step));
+}
+
+void Camera::rotateHotiziontal(double step)
+{
+    this->hasChanged = true;
+    this->phiAngle += step;
+}
+
+void Camera::rotateVertical(double step)
+{
+    this->hasChanged = true;
+    this->tetaAngle += step;
+}
+
+void Camera::rotateCameraLeft()
+{
+    this->hasChanged = true;
+    this->rotateHotiziontal(-ORIZ_ANGLE_STEP);
+}
+
+void Camera::rotateCameraLeft(double step)
+{
+    this->hasChanged = true;
+    this->rotateHotiziontal(-fabs(step));
+}
+
+void Camera::rotateCameraRight()
+{
+    this->hasChanged = true;
+    this->rotateHotiziontal(ORIZ_ANGLE_STEP);
+}
+
+void Camera::rotateCameraRight(double step)
+{
+    this->hasChanged = true;
+    this->rotateHotiziontal(fabs(step));
+}
+
+void Camera::rotateCameraUp()
+{
+    this->hasChanged = true;
+    this->rotateVertical(VERT_ANGLE_STEP);
+}
+
+void Camera::rotateCameraUp(double step)
+{
+    this->hasChanged = true;
+    this->rotateVertical(fabs(step));
+}
+
+void Camera::rotateCameraDown()
+{
+    this->hasChanged = true;
+    this->rotateVertical(-VERT_ANGLE_STEP);
+}
+
+void Camera::rotateCameraDown(double step)
+{
+    this->hasChanged = true;
+    this->rotateVertical(-fabs(step));
+}
+
+// get methods
 
 double Camera::getCameraX()
 {
